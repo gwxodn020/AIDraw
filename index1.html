@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 그림</title>
+  <style>
+    :root {
+      --bg-color: #f9f9f9;
+      --text-color: #333;
+      --canvas-bg: #ffffff;
+      --button-bg: #007bff;
+      --button-hover: #0056b3;
+      --button-text: white;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #181818;
+      --text-color: #f9f9f9;
+      --canvas-bg: #333333;
+      --button-bg: #0056b3;
+      --button-hover: #003f7f;
+      --button-text: #ffffff;
+    }
+
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--bg-color);
+      color: var(--text-color);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-top: 20px;
+      color: var(--text-color);
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    canvas {
+      margin-top: 20px;
+      border: 3px solid var(--button-bg);
+      border-radius: 10px;
+      box-shadow: 0px 5px 15px rgba(0, 123, 255, 0.2);
+      background: var(--canvas-bg);
+      cursor: crosshair;
+    }
+    button {
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 10px 20px;
+      margin: 10px 5px;
+      color: var(--button-text);
+      background: var(--button-bg);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+      transition: background 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background: var(--button-hover);
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0px);
+    }
+    #controls {
+      margin: 20px;
+    }
+    label {
+      font-size: 1rem;
+      margin: 0 10px;
+    }
+    #result {
+      margin-top: 30px;
+    }
+    #result img {
+      max-width: 100%;
+      height: auto;
+      border: 3px solid var(--button-bg);
+      border-radius: 10px;
+      box-shadow: 0px 5px 15px rgba(0, 123, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <h1>AI 그림</h1>
+  <button id="toggleTheme">다크 모드</button>
+  <div id="controls">
+    <label for="lineColor">선 색상:</label>
+    <input type="color" id="lineColor" value="#000000">
+    <label for="lineWidth">선 두께:</label>
+    <input type="range" id="lineWidth" min="1" max="10" value="5">
+  </div>
+  <canvas id="drawingCanvas" width="400" height="400"></canvas>
+  <br>
+  <button id="clearCanvas">지우기</button>
+  <button id="saveImage">저장하기</button>
+  <button id="uploadImage">불러오기</button>
+  <button id="replayDrawing">애니메이션 보기</button>
+  <button id="generateAI">AI 분석</button>
+  <div id="result"></div>
+  <input type="file" id="imageLoader" accept="image/*" style="display: none;">
+</body>
+<script>
+  const canvas = document.getElementById('drawingCanvas');
+  const ctx = canvas.getContext('2d');
+  const colorPicker = document.getElementById('lineColor');
+  const lineWidthPicker = document.getElementById('lineWidth');
+  const imageLoader = document.getElementById('imageLoader');
+  const toggleThemeButton = document.getElementById('toggleTheme');
+  let drawing = false;
+  let actions = []; 
+  toggleThemeButton.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if (currentTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      toggleThemeButton.textContent = '다크 모드';
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      toggleThemeButton.textContent = '라이트 모드';
+    }
+  });
+  canvas.addEventListener('mousedown', () => drawing = true);
+  canvas.addEventListener('mouseup', () => {
+    drawing = false;
+    ctx.beginPath();
+  });
+  canvas.addEventListener('mousemove', draw);
+
+  function draw(event) {
+    if (!drawing) return;
+    ctx.strokeStyle = colorPicker.value; 
+    ctx.lineWidth = lineWidthPicker.value; 
+    ctx.lineCap = 'round';
+
+    actions.push({
+      x: event.offsetX,
+      y: event.offsetY,
+      color: ctx.strokeStyle,
+      width: ctx.lineWidth
+    });
+
+    ctx.lineTo(event.offsetX, event.offsetY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(event.offsetX, event.offsetY);
+  }
+
+  document.getElementById('clearCanvas').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    actions = [];
+  });
+
+  document.getElementById('saveImage').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = 'my_drawing.png';
+    link.href = canvas.toDataURL();
+    link.click();
+  });
+
+  document.getElementById('uploadImage').addEventListener('click', () => {
+    imageLoader.click();
+  });
+
+  imageLoader.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('replayDrawing').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < actions.length) {
+        const { x, y, color, width } = actions[i];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        i++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 50);
+  });
+
+  document.getElementById('generateAI').addEventListener('click', async () => {
+    const userInput = prompt("그림에 대해 설명해 주세요 (예: '흐릿한 산 그림', '색상이 부족한 초상화')");
+  
+    if (!userInput) {
+      alert('그림 설명을 입력해야 합니다!');
+      return;
+    }
+  
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer your-api-key'
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: '너는 이미지 전문가입니다. 사용자가 그림에 대해 설명하면 분석하고 개선점을 제안해 주세요.' },
+            { role: 'user', content: `그림 설명: ${userInput}` }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        })
+      });
+  
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        console.error('응답 상태:', response.status, '상세 정보:', errorDetails);
+        throw new Error('GPT-3.5 Turbo API 요청 실패');
+      }
+  
+      const data = await response.json();
+      const feedback = data.choices[0].message.content;
+  
+      document.getElementById('result').innerHTML = `
+        <p><strong>분석 결과:</strong></p>
+        <p>${feedback}</p>
+      `;
+    } catch (error) {
+      console.error('에러 발생:', error);
+      alert('GPT API 요청 중 문제가 발생했습니다.');
+    }
+  });
+</script>
+</html>
